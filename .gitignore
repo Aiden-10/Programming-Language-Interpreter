@@ -1,0 +1,9 @@
+*.exe
+*.obj
+*.o
+*.pdb
+*.ilk
+
+# Visual Studio
+.vs/git 
+*.sln.docstates

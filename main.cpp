@@ -7,17 +7,27 @@
 
 int main() {
     std::string source =
-        "let interest_rate = 10;\n"
-        "let price = 5;\n"
+        "let interest_rate = 10@;\n"
+        "let price = 5%%;\n"
         "let z = interest_rate + price;\n"
-        "print(z);";
+        "print(z);\n"
+        "print(10 + 5 * 2);\n"
+        "print((10 + 5) * 2);\n"
+        "print(20 / 5 + 3);\n"
+        "print(20 / (5 + 5));\n"
+        "print(10 - 6 / 2);\n"
+        "print(2 + 3 * 4 - 8 / 2);\n"
+        "print(20 / 5 / 2);\n"
+        "print(8 - 3 - 2);\n"
+        "print(z * 2 + price);";
 
-    Parser parser(source);
+    ErrorHandler errorHandler;
+    Parser parser(source, errorHandler);
 
     auto ast = parser.parseProgram();
 
     if (!ast) {
-        std::cerr << "Parsing failed!\n";
+        errorHandler.displayErrors();
         return 1;
     }
 

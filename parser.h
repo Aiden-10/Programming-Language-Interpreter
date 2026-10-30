@@ -10,11 +10,7 @@
 #include <memory>
 
 #include "ast.h"
-
-enum class ErrorType {
-    WARNING,
-    FATAL
-};
+#include "error.h"
 
 struct Program {
     std::vector<std::unique_ptr<Statement>> statements;
@@ -22,10 +18,11 @@ struct Program {
 
 class Parser {
 private:
+    ErrorHandler& errorHandler;
     Lexer lexer;
     Token currentToken;
 public:
-    Parser(std::string_view source) : lexer(source) {
+    Parser(std::string_view source, ErrorHandler& errorHandler) : errorHandler(errorHandler), lexer(source, errorHandler) {
         currentToken = lexer.nextToken();
     }
     
@@ -34,6 +31,7 @@ public:
         auto program = std::make_unique<Program>();
 
         while (currentToken.type != TokenType::END_OF_FILE) {
+
             auto statement = parseStatement();
 
             if (!statement) {
@@ -108,6 +106,7 @@ private:
         return std::make_unique<ExpressionStatement>(std::move(expression));
     }
 
+    // Parse a single value, such as a number, variable, or parenthesized expression
     std::unique_ptr<Expression> parseExpressionPrimary() {
         if (currentToken.type == TokenType::IDENTIFIER) {
             std::string name(currentToken.value);
@@ -125,11 +124,54 @@ private:
             return std::make_unique<NumberExpression>(value);
         }
 
-        return nullptr;
-    } 
+        if (currentToken.type == TokenType::LEFT_PAREN) {
+            currentToken = lexer.nextToken();
 
-    std::unique_ptr<Expression> parseExpression() {
+            auto expression = parseExpression();
+            if (!expression) return nullptr;
+
+            if (!expect(TokenType::RIGHT_PAREN)) return nullptr;
+
+            return expression;
+        }
+
+        return nullptr;
+    }
+
+    // Parse multiplication and division expressions
+    std::unique_ptr<Expression> parseTerm() {
         auto left = parseExpressionPrimary();
+        if (!left) return nullptr;
+
+        while (currentToken.type == TokenType::STAR || currentToken.type == TokenType::SLASH) {
+            char op;
+            switch (currentToken.type) {
+                case TokenType::STAR:
+                    op = '*';
+                    break;
+
+                case TokenType::SLASH:
+                    op = '/';
+                    break;
+
+                default:
+                    return nullptr;
+            }
+
+            currentToken = lexer.nextToken();
+
+            auto right = parseExpressionPrimary();
+            if (!right) return nullptr;
+
+            left = std::make_unique<BinaryExpression>(std::move(left), op, std::move(right));
+        }
+
+        return left;
+    }
+
+    // Parse addition and subtraction expressions
+    std::unique_ptr<Expression> parseExpression() {
+        auto left = parseTerm();
         if (!left) return nullptr;
 
         while (currentToken.type == TokenType::PLUS  || currentToken.type == TokenType::MINUS) {
@@ -150,7 +192,7 @@ private:
 
             currentToken = lexer.nextToken();
 
-            auto right = parseExpressionPrimary();
+            auto right = parseTerm();
             if (!right) return nullptr;
 
             left = std::make_unique<BinaryExpression>(std::move(left), op, std::move(right));

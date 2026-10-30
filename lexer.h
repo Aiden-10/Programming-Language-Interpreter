@@ -11,6 +11,8 @@
 #include <vector>
 #include <stdexcept>
 
+#include "error.h"
+
 enum class TokenType {
     // Keywords
     LET,
@@ -44,17 +46,24 @@ struct Token {
 
 class Lexer {
 private:
+    ErrorHandler& errorHandler;
     std::string_view source;
     size_t current = 0;
+    size_t currentLine = 1;
 
 public:
-    Lexer(std::string_view source) : source(source) {};
+    Lexer(std::string_view source, ErrorHandler& errorHandler) : source(source), errorHandler(errorHandler) {};
 
     Token nextToken() {
         Token token = {};
 
         // Remove whitespace
         while (current < source.size() && std::isspace(source[current])) {
+            // Track line number for errors
+            if (source[current] == '\n') {
+                currentLine++;
+            }
+
             current++;
         }
 
@@ -169,9 +178,20 @@ public:
             return token;
         }
 
-        throw std::runtime_error(
-            "Invalid character: " + std::string(source.substr(current, 1))
-        );
+        errorHandler.report({
+            ErrorStage::LEXER,
+            ErrorSeverity::ERROR,
+            currentLine,
+            current,
+            "Invalid character: '" + std::string(source.substr(current, 1)) + "'"
+        });
+
+        token.type = TokenType::INVALID;
+        token.value = source.substr(current, 1);
+
+        current++;
+
+        return token;
     }
 
     // return the full program back tokenized
